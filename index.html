@@ -1,36 +1,39 @@
 <!DOCTYPE html>
 <!--
-╔══════════════════════════════════════════════════════════════════════════════╗
-║                           VERSION 7 - FINAL                                  ║
-╚══════════════════════════════════════════════════════════════════════════════╝
+β•”β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•—
+β•‘                           VERSION 9 - FINAL UPDATES                          β•‘
+β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•
 
-🆕 CHANGES IN V7:
-   ✅ REMOVED: Credit card puzzle completely
-   ✅ KEPT: Beautiful UI from V5 (big buttons, progress bar, testing section)
-   ✅ Flow: Phase 1 (11 questions) → Phase 2 (10 NFCs) → Phase 3 (Navigation + Final) → Victory
-   ✅ Real-time timer (continues even when app is closed)
-   ✅ Simplified navigation - needle + distance + light
-   ✅ Final stats screen (time, correct answers, helps used)
+π†• CHANGES IN V9:
+   β… REMOVED: Compass needle (only distance + beep sound)
+   β… FIXED: Timer starts from Phase 1 (not Phase 3)
+   β… NEW: Joker "32" - Unlocks unlimited wrong entries (after Phidias/Pericles used)
+   β… NEW: Joker "33" - Skip navigation, go directly to final question
+   β… FIXED: Wrong answer feedback doesn't show correct answer
 
-📊 CONFIGURATION:
+π“ CONFIGURATION:
    - Quiz Answers: 09, 26, 11, 03, 18, 06, 13, 21, 04, 29, 12
-   - NFC Sequence: 6 → 8 → 3 → 1 → 5 → 7 → 2 → 9 → 4 → 10
+   - NFC Sequence: 6 β†’ 8 β†’ 3 β†’ 1 β†’ 5 β†’ 7 β†’ 2 β†’ 9 β†’ 4 β†’ 10
    - Final Answer: 480
-   - Timer: 90 minutes (real-time tracking)
+   - Timer: 90 minutes (starts from Phase 1)
    - Location: 37.955326, 23.725608 (5m radius)
 
-🎮 SHORTCUTS:
-   00 → Skip to Phase 2
-   31 → Skip to Phase 3
+π® SHORTCUTS:
+   00 β†’ Skip to Phase 2
+   31 β†’ Skip to Phase 3
+   32 β†’ Unlock unlimited entries (Game Master override)
+   33 β†’ Skip to final question
 
-═══════════════════════════════════════════════════════════════════════════════
+β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•β•
 -->
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="theme-color" content="#1e1b4b">
-    <title>Acropolis Treasure Hunt - v7</title>
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <title>Acropolis Treasure Hunt</title>
     
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -71,6 +74,8 @@
           const CORRECT_ANSWERS = ['09', '26', '11', '03', '18', '06', '13', '21', '04', '29', '12'];
           const SHORTCUT_PHASE2 = '00';
           const SHORTCUT_PHASE3 = '31';
+          const GAMEMASTER_OVERRIDE = '32';
+          const SKIP_TO_FINAL = '33';
           const CORRECT_NFC_SEQUENCE = [6, 8, 3, 1, 5, 7, 2, 9, 4, 10];
           const FINAL_ANSWER = '480';
           const TARGET_LAT = 37.955326;
@@ -87,9 +92,9 @@
           const [scannedSequence, setScannedSequence] = useState([]);
           const [needsJoker, setNeedsJoker] = useState(false);
           const [jokerMessage, setJokerMessage] = useState('');
+          const [gameMasterMode, setGameMasterMode] = useState(false);
           const [userLocation, setUserLocation] = useState(null);
           const [distance, setDistance] = useState(null);
-          const [bearing, setBearing] = useState(0);
           const [locationUnlocked, setLocationUnlocked] = useState(false);
           const [gpsEnabled, setGpsEnabled] = useState(false);
           const [gpsError, setGpsError] = useState('');
@@ -106,7 +111,7 @@
           const watchIdRef = useRef(null);
 
           useEffect(() => {
-            const saved = localStorage.getItem('gameState_v7');
+            const saved = localStorage.getItem('gameState_v9');
             if (saved) {
               try {
                 const state = JSON.parse(saved);
@@ -115,6 +120,7 @@
                 setPhidiasUsed(state.phidiasUsed || false);
                 setPericlesUsed(state.periclesUsed || false);
                 setScannedSequence(state.scannedSequence || []);
+                setGameMasterMode(state.gameMasterMode || false);
                 setGameStartTime(state.gameStartTime);
                 setShowFinalQuestion(state.showFinalQuestion || false);
                 setFinalComplete(state.finalComplete || false);
@@ -122,6 +128,11 @@
               } catch (err) {
                 console.error('Failed to restore state:', err);
               }
+            }
+
+            // Start timer immediately
+            if (!gameStartTime) {
+              setGameStartTime(Date.now());
             }
 
             // Handle NFC URL parameter
@@ -143,14 +154,15 @@
                 phidiasUsed,
                 periclesUsed,
                 scannedSequence,
+                gameMasterMode,
                 gameStartTime,
                 showFinalQuestion,
                 finalComplete,
                 gameStats
               };
-              localStorage.setItem('gameState_v7', JSON.stringify(state));
+              localStorage.setItem('gameState_v9', JSON.stringify(state));
             }
-          }, [phase, currentQuestion, phidiasUsed, periclesUsed, scannedSequence, gameStartTime, showFinalQuestion, finalComplete, gameStats]);
+          }, [phase, currentQuestion, phidiasUsed, periclesUsed, scannedSequence, gameMasterMode, gameStartTime, showFinalQuestion, finalComplete, gameStats]);
 
           useEffect(() => {
             if (gameStartTime && !gameOver && !finalComplete) {
@@ -176,7 +188,7 @@
           };
 
           const resetGame = () => {
-            localStorage.removeItem('gameState_v7');
+            localStorage.removeItem('gameState_v9');
             window.location.reload();
           };
 
@@ -196,18 +208,37 @@
 
             const idx = currentQuestion - 1;
 
+            // Shortcut: Skip to Phase 2
             if (input === SHORTCUT_PHASE2) {
               setPhase('transition');
-              setGameStartTime(Date.now());
               setInput('');
               setFeedback(null);
               return;
             }
 
+            // Shortcut: Skip to Phase 3
             if (input === SHORTCUT_PHASE3) {
               setPhase('phase3');
-              setGameStartTime(Date.now());
               setScannedSequence(CORRECT_NFC_SEQUENCE);
+              setInput('');
+              setFeedback(null);
+              return;
+            }
+
+            // Game Master Override: Unlock unlimited entries
+            if (input === GAMEMASTER_OVERRIDE) {
+              setGameMasterMode(true);
+              setNeedsJoker(false);
+              setJokerMessage('π® Game Master Mode Activated!');
+              setInput('');
+              setTimeout(() => setJokerMessage(''), 3000);
+              return;
+            }
+
+            // Skip to Final Question
+            if (input === SKIP_TO_FINAL) {
+              setPhase('phase3');
+              setShowFinalQuestion(true);
               setInput('');
               setFeedback(null);
               return;
@@ -217,11 +248,10 @@
 
             if (isCorrect) {
               setGameStats(prev => ({ ...prev, correctAnswers: prev.correctAnswers + 1 }));
-              setFeedback({ type: 'correct', message: '✓ CORRECT!' });
+              setFeedback({ type: 'correct', message: 'β“ CORRECT!' });
               setTimeout(() => {
                 if (currentQuestion === 11) {
                   setPhase('transition');
-                  setGameStartTime(Date.now());
                 } else {
                   setCurrentQuestion(currentQuestion + 1);
                   setFeedback(null);
@@ -229,8 +259,14 @@
                 setInput('');
               }, 1500);
             } else {
-              setFeedback({ type: 'wrong', message: '✗ WRONG!' });
-              setNeedsJoker(true);
+              // Don't show the correct answer in feedback
+              setFeedback({ type: 'wrong', message: 'β— WRONG!' });
+              // Only require joker if not in Game Master mode
+              if (!gameMasterMode) {
+                setNeedsJoker(true);
+              } else {
+                setInput('');
+              }
             }
           };
 
@@ -269,7 +305,7 @@
 
           const handleNFCScan = (nfcId) => {
             if (scannedSequence.includes(nfcId)) {
-              setFeedback({ type: 'error', message: '⚠️ Already scanned!' });
+              setFeedback({ type: 'error', message: 'β οΈ Already scanned!' });
               setTimeout(() => setFeedback(null), 2000);
               return;
             }
@@ -279,7 +315,7 @@
             if (nfcId === expectedNext) {
               const newSequence = [...scannedSequence, nfcId];
               setScannedSequence(newSequence);
-              setFeedback({ type: 'correct', message: `Card ${nfcId} ✓` });
+              setFeedback({ type: 'correct', message: `Card ${nfcId} β“` });
 
               if (newSequence.length === 10) {
                 setTimeout(() => {
@@ -301,23 +337,13 @@
 
           const calculateDistance = (lat1, lng1, lat2, lng2) => {
             const R = 6371e3;
-            const φ1 = (lat1 * Math.PI) / 180;
-            const φ2 = (lat2 * Math.PI) / 180;
-            const Δφ = ((lat2 - lat1) * Math.PI) / 180;
-            const Δλ = ((lng2 - lng1) * Math.PI) / 180;
-            const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) + Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+            const Ο†1 = (lat1 * Math.PI) / 180;
+            const Ο†2 = (lat2 * Math.PI) / 180;
+            const Ξ”Ο† = ((lat2 - lat1) * Math.PI) / 180;
+            const Ξ”Ξ» = ((lng2 - lng1) * Math.PI) / 180;
+            const a = Math.sin(Ξ”Ο† / 2) * Math.sin(Ξ”Ο† / 2) + Math.cos(Ο†1) * Math.cos(Ο†2) * Math.sin(Ξ”Ξ» / 2) * Math.sin(Ξ”Ξ» / 2);
             const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
             return R * c;
-          };
-
-          const calculateBearing = (lat1, lng1, lat2, lng2) => {
-            const φ1 = (lat1 * Math.PI) / 180;
-            const φ2 = (lat2 * Math.PI) / 180;
-            const Δλ = ((lng2 - lng1) * Math.PI) / 180;
-            const y = Math.sin(Δλ) * Math.cos(φ2);
-            const x = Math.cos(φ1) * Math.sin(φ2) - Math.sin(φ1) * Math.cos(φ2) * Math.cos(Δλ);
-            const θ = Math.atan2(y, x);
-            return ((θ * 180) / Math.PI + 360) % 360;
           };
 
           const getBeepInterval = (dist) => {
@@ -345,9 +371,6 @@
 
                 const dist = calculateDistance(userLat, userLng, TARGET_LAT, TARGET_LNG);
                 setDistance(dist);
-
-                const bear = calculateBearing(userLat, userLng, TARGET_LAT, TARGET_LNG);
-                setBearing(bear);
 
                 if (dist <= UNLOCK_RADIUS && !locationUnlocked) {
                   setLocationUnlocked(true);
@@ -384,11 +407,11 @@
               const totalTime = INITIAL_TIME - timeRemaining;
               setGameStats(prev => ({ ...prev, totalTime }));
               setFinalComplete(true);
-              setFeedback({ type: 'correct', message: '✓ CORRECT!' });
+              setFeedback({ type: 'correct', message: 'β“ CORRECT!' });
               if (watchIdRef.current) navigator.geolocation.clearWatch(watchIdRef.current);
               if (beepIntervalRef.current) clearInterval(beepIntervalRef.current);
             } else {
-              setFeedback({ type: 'incorrect', message: '✗ WRONG! Try again.' });
+              setFeedback({ type: 'incorrect', message: 'β— WRONG! Try again.' });
               setTimeout(() => setFeedback(null), 2000);
             }
           };
@@ -397,7 +420,7 @@
             return (
               <div className="min-h-screen bg-gradient-to-br from-gray-900 to-black p-4 flex items-center justify-center">
                 <div className="text-center max-w-md">
-                  <div className="text-6xl mb-6">⏰</div>
+                  <div className="text-6xl mb-6">β°</div>
                   <h1 className="text-3xl font-bold text-white mb-4">Time's Up!</h1>
                   <p className="text-gray-300 text-lg mb-8">The quest has ended. Better luck next time!</p>
                   <button onClick={resetGame} className="bg-blue-500 hover:bg-blue-600 text-white text-xl font-bold px-8 py-4 rounded-lg transition active:scale-95 flex items-center gap-2 mx-auto">
@@ -414,7 +437,7 @@
                 <div className="w-full max-w-md">
                   <div className="text-center mb-6">
                     <div className={`text-3xl font-mono font-bold ${timeRemaining < 300 ? 'text-red-400 animate-pulse' : timeRemaining < 600 ? 'text-yellow-300' : 'text-green-300'}`}>
-                      ⏱️ {formatTime(timeRemaining)}
+                      β±οΈ {formatTime(timeRemaining)}
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-2 mb-6">
@@ -438,15 +461,16 @@
                     {jokerMessage && <div className="text-2xl font-bold text-yellow-400 animate-pulse mb-2">{jokerMessage}</div>}
                     {feedback && <div className={`text-2xl font-bold animate-pulse ${feedback.type === 'correct' ? 'text-green-400' : feedback.type === 'wrong' ? 'text-red-400' : 'text-orange-400'}`}>{feedback.message}</div>}
                     {!feedback && !jokerMessage && !needsJoker && <div className="text-gray-400 text-sm">Enter photo number</div>}
-                    {needsJoker && <div className="text-red-400 text-lg font-bold animate-pulse">Use a Joker to continue!</div>}
+                    {needsJoker && !gameMasterMode && <div className="text-red-400 text-lg font-bold animate-pulse">Use a Joker to continue!</div>}
+                    {gameMasterMode && <div className="text-green-400 text-sm">π® Game Master Mode</div>}
                   </div>
                   <div className="grid grid-cols-3 gap-3 mb-4">
                     {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(num => (
-                      <button key={num} onClick={() => handleNumberClick(num.toString())} disabled={needsJoker} className={`${needsJoker ? 'bg-gray-500/20 cursor-not-allowed' : 'bg-white/20 hover:bg-white/30'} backdrop-blur text-white text-3xl font-bold py-6 rounded-lg transition active:scale-95`}>{num}</button>
+                      <button key={num} onClick={() => handleNumberClick(num.toString())} disabled={needsJoker && !gameMasterMode} className={`${needsJoker && !gameMasterMode ? 'bg-gray-500/20 cursor-not-allowed' : 'bg-white/20 hover:bg-white/30'} backdrop-blur text-white text-3xl font-bold py-6 rounded-lg transition active:scale-95`}>{num}</button>
                     ))}
-                    <button onClick={handleClear} disabled={needsJoker} className={`${needsJoker ? 'bg-gray-500/30 cursor-not-allowed' : 'bg-red-500/30 hover:bg-red-500/50'} text-white text-xl font-bold py-6 rounded-lg transition active:scale-95`}>CLEAR</button>
-                    <button onClick={() => handleNumberClick('0')} disabled={needsJoker} className={`${needsJoker ? 'bg-gray-500/20 cursor-not-allowed' : 'bg-white/20 hover:bg-white/30'} backdrop-blur text-white text-3xl font-bold py-6 rounded-lg transition active:scale-95`}>0</button>
-                    <button onClick={handleSubmit} disabled={needsJoker} className={`${needsJoker ? 'bg-gray-500 cursor-not-allowed' : 'bg-green-500 hover:bg-green-600'} text-white text-xl font-bold py-6 rounded-lg transition active:scale-95`}>ENTER</button>
+                    <button onClick={handleClear} disabled={needsJoker && !gameMasterMode} className={`${needsJoker && !gameMasterMode ? 'bg-gray-500/30 cursor-not-allowed' : 'bg-red-500/30 hover:bg-red-500/50'} text-white text-xl font-bold py-6 rounded-lg transition active:scale-95`}>CLEAR</button>
+                    <button onClick={() => handleNumberClick('0')} disabled={needsJoker && !gameMasterMode} className={`${needsJoker && !gameMasterMode ? 'bg-gray-500/20 cursor-not-allowed' : 'bg-white/20 hover:bg-white/30'} backdrop-blur text-white text-3xl font-bold py-6 rounded-lg transition active:scale-95`}>0</button>
+                    <button onClick={handleSubmit} disabled={needsJoker && !gameMasterMode} className={`${needsJoker && !gameMasterMode ? 'bg-gray-500 cursor-not-allowed' : 'bg-green-500 hover:bg-green-600'} text-white text-xl font-bold py-6 rounded-lg transition active:scale-95`}>ENTER</button>
                   </div>
                 </div>
               </div>
@@ -474,7 +498,7 @@
                 <div className="w-full max-w-md">
                   <div className="text-center mb-6">
                     <div className={`text-3xl font-mono font-bold ${timeRemaining < 300 ? 'text-red-400 animate-pulse' : timeRemaining < 600 ? 'text-yellow-300' : 'text-green-300'}`}>
-                      ⏱️ {formatTime(timeRemaining)}
+                      β±οΈ {formatTime(timeRemaining)}
                     </div>
                   </div>
                   <div className="bg-white/10 backdrop-blur rounded-lg p-4 mb-6">
@@ -519,7 +543,7 @@
               <div className="min-h-screen bg-gradient-to-br from-amber-900 via-yellow-900 to-orange-900 p-4 flex items-center justify-center">
                 <div className="max-w-2xl w-full">
                   <div className="text-center mb-8">
-                    <div className="text-6xl mb-4">🏛️</div>
+                    <div className="text-6xl mb-4">π›οΈ</div>
                     <h1 className="text-3xl font-bold text-yellow-200 mb-6">Look through the gates!</h1>
                   </div>
                   <div className="bg-white/10 backdrop-blur rounded-lg p-8 mb-8">
@@ -583,7 +607,7 @@
                 <div className="max-w-md mx-auto">
                   <div className="text-center mb-6">
                     <div className={`text-3xl font-mono font-bold ${timeRemaining < 300 ? 'text-red-400 animate-pulse' : timeRemaining < 600 ? 'text-yellow-300' : 'text-green-300'}`}>
-                      ⏱️ {formatTime(timeRemaining)}
+                      β±οΈ {formatTime(timeRemaining)}
                     </div>
                   </div>
                   {!gpsEnabled ? (
@@ -597,18 +621,10 @@
                       <div className="fixed top-6 right-6 z-50">
                         <div className={`w-20 h-20 rounded-full ${distance ? 'bg-green-500' : 'bg-gray-600'}`} style={{ animation: distance ? `blink ${getBeepInterval(distance) / 1000}s ease-in-out infinite` : 'none', boxShadow: distance ? '0 0 30px rgba(34, 197, 94, 0.8)' : 'none' }} />
                       </div>
-                      <div className="bg-white/10 backdrop-blur rounded-lg p-8 mb-6 mt-8">
-                        <div className="relative w-72 h-72 mx-auto bg-gray-800 rounded-full shadow-2xl border-4 border-amber-700 flex items-center justify-center">
-                          <div className="absolute transition-transform duration-1000" style={{ transform: `rotate(${bearing}deg)` }}>
-                            <div className="w-2 bg-red-500 rounded-full" style={{ height: '120px', marginLeft: '-4px' }}>
-                              <div className="w-0 h-0 absolute -top-2" style={{ borderLeft: '8px solid transparent', borderRight: '8px solid transparent', borderBottom: '16px solid #ef4444', left: '-6px' }} />
-                            </div>
-                          </div>
-                        </div>
-                      </div>
                       {distance !== null && (
-                        <div className="bg-white/10 backdrop-blur rounded-lg p-6 text-center">
-                          <div className="text-white text-5xl font-bold mb-2">{distance.toFixed(1)}m</div>
+                        <div className="bg-white/10 backdrop-blur rounded-lg p-8 text-center">
+                          <div className="text-white text-6xl font-bold mb-4">{distance.toFixed(1)}m</div>
+                          <div className="text-gray-300 text-lg mb-2">Distance to target</div>
                           {userLocation && <div className="text-gray-400 text-xs">GPS: {userLocation.lat.toFixed(6)}, {userLocation.lng.toFixed(6)}</div>}
                         </div>
                       )}
